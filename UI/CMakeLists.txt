@@ -1,4 +1,3 @@
-option(ENABLE_UI "Enables the OBS user interfaces" ON)
 if(DISABLE_UI)
 	message(STATUS "UI disabled")
 	return()
@@ -14,7 +13,7 @@ add_subdirectory(obs-frontend-api)
 
 project(obs)
 
-set(ENABLE_WIN_UPDATER FALSE CACHE BOOL "Enable the windows updater")
+set(DISABLE_UPDATE_MODULE TRUE CACHE BOOL "Disables building the update module")
 
 if(DEFINED QTDIR${_lib_suffix})
 	list(APPEND CMAKE_PREFIX_PATH "${QTDIR${_lib_suffix}}")
@@ -37,6 +36,10 @@ endif()
 
 find_package(Qt5Widgets ${FIND_MODE})
 find_package(FFmpeg REQUIRED COMPONENTS avcodec avutil avformat)
+
+if(APPLE)
+	find_package(Qt5MacExtras REQUIRED)
+endif(APPLE)
 
 if(NOT Qt5Widgets_FOUND)
 	if (ENABLE_UI)
@@ -75,10 +78,6 @@ if(WIN32)
 		crypt32
 		blake2
 		${OBS_JANSSON_IMPORT})
-
-	if(ENABLE_WIN_UPDATER)
-		add_definitions(-DENABLE_WIN_UPDATER)
-	endif()
 elseif(APPLE)
 	set(obs_PLATFORM_SOURCES
 		platform-osx.mm)
@@ -162,6 +161,7 @@ set(obs_SOURCES
 	item-widget-helpers.cpp
 	visibility-checkbox.cpp
 	locked-checkbox.cpp
+	horizontal-scroll-area.cpp
 	vertical-scroll-area.cpp
 	visibility-item-widget.cpp
 	slider-absoluteset-style.cpp
@@ -210,6 +210,7 @@ set(obs_HEADERS
 	item-widget-helpers.hpp
 	visibility-checkbox.hpp
 	locked-checkbox.hpp
+	horizontal-scroll-area.hpp
 	vertical-scroll-area.hpp
 	visibility-item-widget.hpp
 	slider-absoluteset-style.hpp
@@ -270,6 +271,20 @@ target_link_libraries(obs
 	${FFMPEG_LIBRARIES}
 	${LIBCURL_LIBRARIES}
 	${obs_PLATFORM_LIBRARIES})
+
+if (APPLE)
+	target_link_libraries(obs
+			Qt5::MacExtras)
+	set_target_properties(obs PROPERTIES LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
+	set_property(
+		TARGET obs
+		APPEND
+		PROPERTY INSTALL_RPATH
+		"/usr/local/Cellar/python3/3.6.4_2/Frameworks/Python.framework/Versions/3.6/lib/"
+		"/Library/Frameworks/Python.framework/Versions/3.6/lib/"
+		"/opt/local/Library/Frameworks/Python.framework/Versions/3.6/lib/"
+	)
+endif()
 
 define_graphic_modules(obs)
 

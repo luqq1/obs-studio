@@ -61,6 +61,21 @@ static inline enum audio_format convert_sample_format(int f)
 	return AUDIO_FORMAT_UNKNOWN;
 }
 
+static inline enum speaker_layout convert_speaker_layout(uint8_t channels)
+{
+	switch (channels) {
+	case 0:     return SPEAKERS_UNKNOWN;
+	case 1:     return SPEAKERS_MONO;
+	case 2:     return SPEAKERS_STEREO;
+	case 3:     return SPEAKERS_2POINT1;
+	case 4:     return SPEAKERS_4POINT0;
+	case 5:     return SPEAKERS_4POINT1;
+	case 6:     return SPEAKERS_5POINT1;
+	case 8:     return SPEAKERS_7POINT1;
+	default:    return SPEAKERS_UNKNOWN;
+	}
+}
+
 static inline enum video_colorspace convert_color_space(enum AVColorSpace s)
 {
 	return s == AVCOL_SPC_BT709 ? VIDEO_CS_709 : VIDEO_CS_DEFAULT;
@@ -256,8 +271,8 @@ static void mp_media_next_audio(mp_media_t *m)
 	for (size_t i = 0; i < MAX_AV_PLANES; i++)
 		audio.data[i] = f->data[i];
 
-	audio.samples_per_sec = f->sample_rate;
-	audio.speakers = (enum speaker_layout)f->channels;
+	audio.samples_per_sec = f->sample_rate * m->speed / 100;
+	audio.speakers = convert_speaker_layout(f->channels);
 	audio.format = convert_sample_format(f->format);
 	audio.frames = f->nb_samples;
 	audio.timestamp = m->base_ts + d->frame_pts - m->start_ts +
@@ -637,9 +652,7 @@ static void *mp_media_thread_start(void *opaque)
 }
 
 static inline bool mp_media_init_internal(mp_media_t *m,
-		const char *path,
-		const char *format_name,
-		bool hw)
+		const struct mp_media_info *info)
 {
 	if (pthread_mutex_init(&m->mutex, NULL) != 0) {
 		blog(LOG_WARNING, "MP: Failed to init mutex");
@@ -650,9 +663,9 @@ static inline bool mp_media_init_internal(mp_media_t *m,
 		return false;
 	}
 
-	m->path = path ? bstrdup(path) : NULL;
-	m->format_name = format_name ? bstrdup(format_name) : NULL;
-	m->hw = hw;
+	m->path = info->path ? bstrdup(info->path) : NULL;
+	m->format_name = info->format ? bstrdup(info->format) : NULL;
+	m->hw = info->hardware_decoding;
 
 	if (pthread_create(&m->thread, NULL, mp_media_thread_start, m) != 0) {
 		blog(LOG_WARNING, "MP: Could not create media thread");
@@ -663,29 +676,22 @@ static inline bool mp_media_init_internal(mp_media_t *m,
 	return true;
 }
 
-bool mp_media_init(mp_media_t *media,
-		const char *path,
-		const char *format,
-		int buffering,
-		void *opaque,
-		mp_video_cb v_cb,
-		mp_audio_cb a_cb,
-		mp_stop_cb stop_cb,
-		mp_video_cb v_preload_cb,
-		bool hw_decoding,
-		bool is_local_file,
-		enum video_range_type force_range)
+bool mp_media_init(mp_media_t *media, const struct mp_media_info *info)
 {
 	memset(media, 0, sizeof(*media));
 	pthread_mutex_init_value(&media->mutex);
-	media->opaque = opaque;
-	media->v_cb = v_cb;
-	media->a_cb = a_cb;
-	media->stop_cb = stop_cb;
-	media->v_preload_cb = v_preload_cb;
-	media->force_range = force_range;
-	media->buffering = buffering;
-	media->is_local_file = is_local_file;
+	media->opaque = info->opaque;
+	media->v_cb = info->v_cb;
+	media->a_cb = info->a_cb;
+	media->stop_cb = info->stop_cb;
+	media->v_preload_cb = info->v_preload_cb;
+	media->force_range = info->force_range;
+	media->buffering = info->buffering;
+	media->speed = info->speed;
+	media->is_local_file = info->is_local_file;
+
+	if (!info->is_local_file || media->speed < 1 || media->speed > 200)
+		media->speed = 100;
 
 	static bool initialized = false;
 	if (!initialized) {
@@ -699,7 +705,7 @@ bool mp_media_init(mp_media_t *media,
 	if (!base_sys_ts)
 		base_sys_ts = (int64_t)os_gettime_ns();
 
-	if (!mp_media_init_internal(media, path, format, hw_decoding)) {
+	if (!mp_media_init_internal(media, info)) {
 		mp_media_free(media);
 		return false;
 	}

@@ -149,10 +149,12 @@ struct obs_transform_info {
  * Video initialization structure
  */
 struct obs_video_info {
+#ifndef SWIG
 	/**
 	 * Graphics module to use (usually "libobs-opengl" or "libobs-d3d11")
 	 */
 	const char          *graphics_module;
+#endif
 
 	uint32_t            fps_num;       /**< Output FPS numerator */
 	uint32_t            fps_den;       /**< Output FPS denominator */
@@ -274,6 +276,12 @@ EXPORT void obs_set_locale(const char *locale);
 /** @return the current locale */
 EXPORT const char *obs_get_locale(void);
 
+/** Initialize the Windows-specific crash handler */
+
+#ifdef _WIN32
+EXPORT void obs_init_win32_crash_handler(void);
+#endif
+
 /**
  * Returns the profiler name store (see util/profiler.h) used by OBS, which is
  * either a name store passed to obs_startup, an internal name store, or NULL
@@ -381,6 +389,7 @@ EXPORT void obs_load_all_modules(void);
  * be called after all modules have been loaded. */
 EXPORT void obs_post_load_modules(void);
 
+#ifndef SWIG
 struct obs_module_info {
 	const char *bin_path;
 	const char *data_path;
@@ -391,6 +400,7 @@ typedef void (*obs_find_module_callback_t)(void *param,
 
 /** Finds all modules within the search paths added by obs_add_module_path. */
 EXPORT void obs_find_modules(obs_find_module_callback_t callback, void *param);
+#endif
 
 typedef void (*obs_enum_module_callback_t)(void *param, obs_module_t *module);
 
@@ -539,9 +549,11 @@ enum obs_base_effect {
 /** Returns a commonly used base effect */
 EXPORT gs_effect_t *obs_get_base_effect(enum obs_base_effect effect);
 
+#ifndef SWIG
 /* DEPRECATED: gets texture_rect default effect */
 DEPRECATED
 EXPORT gs_effect_t *obs_get_default_rect_effect(void);
+#endif
 
 /** Returns the primary obs signal handler */
 EXPORT signal_handler_t *obs_get_signal_handler(void);
@@ -549,8 +561,18 @@ EXPORT signal_handler_t *obs_get_signal_handler(void);
 /** Returns the primary obs procedure handler */
 EXPORT proc_handler_t *obs_get_proc_handler(void);
 
+#ifndef SWIG
 /** Renders the main view */
+DEPRECATED
 EXPORT void obs_render_main_view(void);
+#endif
+
+/** Renders the last main output texture */
+EXPORT void obs_render_main_texture(void);
+
+/** Returns the last main output texture.  This can return NULL if the texture
+ * is unavailable. */
+EXPORT gs_texture_t *obs_get_main_texture(void);
 
 /** Sets the master user volume */
 EXPORT void obs_set_master_volume(float volume);
@@ -563,6 +585,12 @@ EXPORT obs_data_t *obs_save_source(obs_source_t *source);
 
 /** Loads a source from settings data */
 EXPORT obs_source_t *obs_load_source(obs_data_t *data);
+
+/** Send a save signal to sources */
+EXPORT void obs_source_save(obs_source_t *source);
+
+/** Send a load signal to sources */
+EXPORT void obs_source_load(obs_source_t *source);
 
 typedef void (*obs_load_source_cb)(void *private_data, obs_source_t *source);
 
@@ -598,11 +626,26 @@ EXPORT void obs_enum_audio_monitoring_devices(obs_enum_audio_device_cb cb,
 EXPORT bool obs_set_audio_monitoring_device(const char *name, const char *id);
 EXPORT void obs_get_audio_monitoring_device(const char **name, const char **id);
 
+EXPORT void obs_add_tick_callback(
+		void (*tick)(void *param, float seconds),
+		void *param);
+EXPORT void obs_remove_tick_callback(
+		void (*tick)(void *param, float seconds),
+		void *param);
+
 EXPORT void obs_add_main_render_callback(
 		void (*draw)(void *param, uint32_t cx, uint32_t cy),
 		void *param);
 EXPORT void obs_remove_main_render_callback(
 		void (*draw)(void *param, uint32_t cx, uint32_t cy),
+		void *param);
+
+EXPORT void obs_add_raw_video_callback(
+		const struct video_scale_info *conversion,
+		void (*callback)(void *param, struct video_data *frame),
+		void *param);
+EXPORT void obs_remove_raw_video_callback(
+		void (*callback)(void *param, struct video_data *frame),
 		void *param);
 
 
@@ -1421,6 +1464,12 @@ EXPORT void obs_output_force_stop(obs_output_t *output);
 /** Returns whether the output is active */
 EXPORT bool obs_output_active(const obs_output_t *output);
 
+/** Returns output capability flags */
+EXPORT uint32_t obs_output_get_flags(const obs_output_t *output);
+
+/** Returns output capability flags */
+EXPORT uint32_t obs_get_output_flags(const char *id);
+
 /** Gets the default settings for an output type */
 EXPORT obs_data_t *obs_output_defaults(const char *id);
 
@@ -1748,6 +1797,7 @@ EXPORT const char *obs_encoder_get_id(const obs_encoder_t *encoder);
 
 EXPORT uint32_t obs_get_encoder_caps(const char *encoder_id);
 
+#ifndef SWIG
 /** Duplicates an encoder packet */
 DEPRECATED
 EXPORT void obs_duplicate_encoder_packet(struct encoder_packet *dst,
@@ -1755,6 +1805,7 @@ EXPORT void obs_duplicate_encoder_packet(struct encoder_packet *dst,
 
 DEPRECATED
 EXPORT void obs_free_encoder_packet(struct encoder_packet *packet);
+#endif
 
 EXPORT void obs_encoder_packet_ref(struct encoder_packet *dst,
 		struct encoder_packet *src);

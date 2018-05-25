@@ -74,7 +74,7 @@ static bool build_flv_meta_data(obs_output_t *context,
 	enc_str(&enc, end, "onMetaData");
 
 	*enc++ = AMF_ECMA_ARRAY;
-	enc    = AMF_EncodeInt32(enc, end, a_idx == 0 ? 14 : 9);
+	enc    = AMF_EncodeInt32(enc, end, a_idx == 0 ? 20 : 15);
 
 	enc_num_val(&enc, end, "duration", 0.0);
 	enc_num_val(&enc, end, "fileSize", 0.0);
@@ -102,6 +102,18 @@ static bool build_flv_meta_data(obs_output_t *context,
 
 	enc_bool_val(&enc, end, "stereo",
 			audio_output_get_channels(audio) == 2);
+	enc_bool_val(&enc, end, "2.1",
+			audio_output_get_channels(audio) == 3);
+	enc_bool_val(&enc, end, "3.1",
+			audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "4.0",
+			audio_output_get_channels(audio) == 4);
+	enc_bool_val(&enc, end, "4.1",
+			audio_output_get_channels(audio) == 5);
+	enc_bool_val(&enc, end, "5.1",
+			audio_output_get_channels(audio) == 6);
+	enc_bool_val(&enc, end, "7.1",
+			audio_output_get_channels(audio) == 8);
 
 	dstr_printf(&encoder_name, "%s (libobs version ",
 			MODULE_NAME);
